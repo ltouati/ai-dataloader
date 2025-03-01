@@ -127,30 +127,35 @@ where
     /// Create a `Dataloader` from a [`Builder`].
     pub fn build(self) -> DataLoader<D, S, C> {
         #[cfg(feature = "rayon")]
-        if let Some(pool) = THREAD_POOL.get() {
-            if pool.current_num_threads() != self.num_threads {
-                // We reset the threadpool because we can't modify the number of
-                // threads of an existing thread pool.
-                #[cfg(feature = "rayon")]
-                THREAD_POOL
-                    .set(
+        match THREAD_POOL.get() {
+            Some(pool) => {
+                if pool.current_num_threads() != self.num_threads {
+                    // We reset the threadpool because we can't modify the number of
+                    // threads of an existing thread pool.
+                    #[cfg(feature = "rayon")]
+                    THREAD_POOL.set(
                         rayon::ThreadPoolBuilder::new()
                             .num_threads(self.num_threads)
                             .build()
                             .expect("could not spawn threads"),
                     )
-                    .ok();
+                } else {
+                    THREAD_POOL.set(
+                        rayon::ThreadPoolBuilder::new()
+                            .num_threads(self.num_threads)
+                            .build()
+                            .expect("could not spawn threads"),
+                    )
+                }
             }
-        } else {
-            THREAD_POOL
-                .set(
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(self.num_threads)
-                        .build()
-                        .expect("could not spawn threads"),
-                )
-                .ok();
+            _ => THREAD_POOL.set(
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(self.num_threads)
+                    .build()
+                    .expect("could not spawn threads"),
+            ),
         }
+        .ok();
 
         DataLoader {
             dataset: self.dataset,
